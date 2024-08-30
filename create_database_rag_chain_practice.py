@@ -3,11 +3,14 @@ import shutil
 from langchain_community.document_loaders import DirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import GPT4AllEmbeddings
+from langchain_community.document_loaders import FireCrawlLoader
 from langchain.schema import Document
 from langchain_chroma import Chroma #db
+from dotenv import load_dotenv
 
 # data path
-DATA_PATH = "data/books"
+load_dotenv()
+FIRECRAWL_API_KEY=os.getenv('FIRECRAWL_API_KEY')
 CHROMA_PATH = "chroma"
 
 def main():
@@ -26,16 +29,17 @@ def generate_data_store():
 
 # loads the documents into a variable, where the documents are the .md files
 def load_documents():
-    loader = DirectoryLoader(DATA_PATH, glob="*.md") # IN THE FUTURE REPLACE WITH A BETTER CALL?
-    documents = loader.load()
+    loader = DirectoryLoader("data/aws_lambda_docs", glob="*.md") # IN THE FUTURE REPLACE WITH A BETTER CALL?
+    loader2 = DirectoryLoader("data/books", glob="*.md")
+    documents = loader.load() + loader2.load()
     return documents
 
 
 # splits the documents into smaller chunks
 def split_text(documents: list[Document]):
     text_splitter = RecursiveCharacterTextSplitter( # recursive character splitter
-        chunk_size=200,
-        chunk_overlap=100,
+        chunk_size=500,
+        chunk_overlap=150,
         length_function=len,
         add_start_index=True,
     )
@@ -61,6 +65,19 @@ def save_to_chroma(chunks: list[Document]):
         embedding=GPT4AllEmbeddings()
         ) # creating vectors
     print(f"Saved {len(chunks)} chunks to {CHROMA_PATH}.")
+
+
+# with FireCrawlLoader, scrapes the urls into documents
+# not needed, could use in the future
+def web_scraper(urls):
+
+    # one big document of all urls
+    docs = [FireCrawlLoader(api_key=FIRECRAWL_API_KEY, url=url, mode="scrape").load() for url in urls]
+    
+    # split the documents
+    docs_list = [item for sublist in docs for item in sublist]
+    return docs_list
+
 
 if __name__=="__main__":
     main()
